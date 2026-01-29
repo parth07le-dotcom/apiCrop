@@ -9,6 +9,26 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import logo  # root logo.py
 
 class handler(BaseHTTPRequestHandler):
+    import base64
+
+def collect_images_as_base64(folder):
+    images = []
+    if not os.path.exists(folder):
+        return images
+
+    for file in os.listdir(folder):
+        if file.lower().endswith((".png", ".jpg", ".jpeg")):
+            path = os.path.join(folder, file)
+            with open(path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode("utf-8")
+
+            images.append({
+                "name": file,
+                "data_url": f"data:image/png;base64,{encoded}"
+            })
+
+    return images
+
     def do_GET(self):
         try:
             # Vercel only allows writing to /tmp
