@@ -10,21 +10,24 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import logo  # root logo.py
 
 
-def collect_images_as_base64(folder):
+def collect_all_images_as_base64(base_folder):
     images = []
-    if not os.path.exists(folder):
+
+    if not os.path.exists(base_folder):
         return images
 
-    for file in os.listdir(folder):
-        if file.lower().endswith((".png", ".jpg", ".jpeg")):
-            path = os.path.join(folder, file)
-            with open(path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode("utf-8")
+    for root, dirs, files in os.walk(base_folder):
+        for file in files:
+            if file.lower().endswith((".png", ".jpg", ".jpeg")):
+                path = os.path.join(root, file)
+                with open(path, "rb") as f:
+                    encoded = base64.b64encode(f.read()).decode("utf-8")
 
-            images.append({
-                "name": file,
-                "data_url": f"data:image/png;base64,{encoded}"
-            })
+                images.append({
+                    "name": file,
+                    "folder": root.replace(base_folder, ""),
+                    "data_url": f"data:image/png;base64,{encoded}"
+                })
 
     return images
 
@@ -40,9 +43,8 @@ class handler(BaseHTTPRequestHandler):
             # Run your main logic
             result = logo.run(output_dir)
 
-            # Collect images as base64
-            logos_path = os.path.join(output_dir, "logos")
-            images = collect_images_as_base64(logos_path)
+            # Collect ALL images recursively
+            images = collect_all_images_as_base64(output_dir)
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -51,6 +53,7 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({
                 "success": True,
                 "data": result,
+                "total_images": len(images),
                 "images": images
             }).encode())
 
@@ -65,5 +68,4 @@ class handler(BaseHTTPRequestHandler):
             }).encode())
 
     def do_POST(self):
-        # allow POST also
         return self.do_GET()
