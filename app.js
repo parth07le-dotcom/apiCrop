@@ -1,3 +1,5 @@
+import { upload } from 'https://cdn.vercel-storage.com/blob/v1/upload?edge=1';
+
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('file-input');
 const urlInput = document.getElementById('url-input');
@@ -12,7 +14,7 @@ let selectedFile = null;
 let mode = 'upload'; // 'upload' or 'url'
 
 // --- Tabs ---
-function switchTab(newMode) {
+window.switchTab = function (newMode) {
     mode = newMode;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
 
@@ -64,11 +66,11 @@ function handleFileSelect(file) {
 }
 
 // --- Processing ---
-async function startProcessing() {
+window.startProcessing = async function () {
     processBtn.disabled = true;
     progressBar.style.display = 'block';
-    progress.style.width = '10%';
-    statusText.innerText = "Preparing upload...";
+    progress.style.width = '1%';
+    statusText.innerText = "Initializing...";
     galleryGrid.innerHTML = '';
 
     try {
@@ -77,32 +79,43 @@ async function startProcessing() {
         if (mode === 'upload') {
             if (!selectedFile) throw new Error("Please select a file first.");
 
-            // Read file as Base64
-            statusText.innerText = "Reading file...";
-            const base64 = await fileToBase64(selectedFile);
-            // Remove prefix (data:application/pdf;base64,)
-            const cleanBase64 = base64.split(',')[1];
+            statusText.innerText = `Uploading ${selectedFile.name}...`;
 
-            payload = { pdf_base64: cleanBase64 };
+            // Client-Side Upload to Vercel Blob
+            const blob = await upload(selectedFile.name, selectedFile, {
+                access: 'public',
+                handleUploadUrl: '/api/upload_token',
+                onUploadProgress: (event) => {
+                    const percentage = Math.round((event.loaded / event.total) * 100);
+                    // Upload takes first 50% of the bar visually (just for UX feels)
+                    progress.style.width = `${percentage * 0.5}%`;
+                    statusText.innerText = `Uploading: ${percentage}%`;
+                }
+            });
+
+            console.log("File uploaded to Blob:", blob.url);
+            payload = { file_url: blob.url };
+            progress.style.width = '55%';
+
         } else {
             const url = urlInput.value.trim();
             if (!url) throw new Error("Please enter a URL.");
             payload = { file_url: url };
         }
 
-        statusText.innerText = "Uploading & Extracting... (This may take a minute)";
-        progress.style.width = '40%';
+        statusText.innerText = "Extracting assets... (Processing PDF)";
 
-        // Simulating progress animation while waiting
-        let fakeProgress = 40;
+        // Simulating "Processing" progress
+        let fakeProgress = 60;
         const progressInterval = setInterval(() => {
-            if (fakeProgress < 90) {
+            if (fakeProgress < 95) {
                 fakeProgress += 1;
                 progress.style.width = `${fakeProgress}%`;
             }
-        }, 500);
+        }, 300);
 
-        // API Call
+        // API Call to Python Backend
+        // The backend now just receives the URL (from Blob or Input)
         const response = await fetch('/api/logo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -112,15 +125,16 @@ async function startProcessing() {
         clearInterval(progressInterval);
 
         if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
+            const errData = await response.json();
+            throw new Error(errData.error || `Server error: ${response.status}`);
         }
 
         const data = await response.json();
         progress.style.width = '100%';
 
         if (data.success) {
-            statusText.innerText = "Done!";
-            renderGallery(data.data.logos || []); // Handle different response structures if needed
+            statusText.innerText = "Done! Assets extracted.";
+            renderGallery(data.data.logos || []);
         } else {
             throw new Error(data.error || "Unknown error occurred");
         }
@@ -129,18 +143,10 @@ async function startProcessing() {
         statusText.innerText = `Error: ${err.message}`;
         statusText.style.color = 'var(--error)';
         progress.style.backgroundColor = 'var(--error)';
+        console.error(err);
     } finally {
         processBtn.disabled = false;
     }
-}
-
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
 }
 
 function renderGallery(urls) {
