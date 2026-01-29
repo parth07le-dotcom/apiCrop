@@ -1,50 +1,54 @@
 from http.server import BaseHTTPRequestHandler
-import json
-import sys
-import os
-import base64
+import json, os, sys, base64, uuid, urllib.request
 
-# Allow importing from root folder
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import logo
 
-import logo  # root logo.py
-
-
-def collect_all_images_as_base64(base_folder):
-    images = []
-
-    if not os.path.exists(base_folder):
-        return images
-
-    for root, dirs, files in os.walk(base_folder):
-        for file in files:
-            if file.lower().endswith((".png", ".jpg", ".jpeg")):
-                path = os.path.join(root, file)
-                with open(path, "rb") as f:
-                    encoded = base64.b64encode(f.read()).decode("utf-8")
-
-                images.append({
-                    "name": file,
-                    "folder": root.replace(base_folder, ""),
-                    "data_url": f"data:image/png;base64,{encoded}"
-                })
-
-    return images
+from vercel_blob import put
 
 
 class handler(BaseHTTPRequestHandler):
 
-    def do_GET(self):
+    def do_POST(self):
         try:
-            # Vercel only allows writing to /tmp
-            output_dir = "/tmp/assets"
-            os.makedirs(output_dir, exist_ok=True)
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            payload = json.loads(body.decode())
 
-            # Run your main logic
-            result = logo.run(output_dir)
+            job = str(uuid.uuid4())
+            workdir = f"/tmp/{job}"
+            os.makedirs(workdir, exist_ok=True)
 
-            # Collect ALL images recursively
-            images = collect_all_images_as_base64(output_dir)
+            input_path = os.path.join(workdir, "input.pdf")
+
+            # CASE 1: PDF upload
+            if "pdf_base64" in payload:
+                file_bytes = base64.b64decode(payload["pdf_base64"])
+                open(input_path, "wb").write(file_bytes)
+
+            # CASE 2: File URL
+            elif "file_url" in payload:
+                urllib.request.urlretrieve(payload["file_url"], input_path)
+
+            else:
+                raise Exception("No file provided")
+
+            # RUN YOUR LOGIC
+            result = logo.run(workdir, input_path)
+
+            # UPLOAD ONLY LOGOS
+            logos_dir = os.path.join(workdir, "logos")
+            logo_urls = []
+
+            if os.path.exists(logos_dir):
+                for f in os.listdir(logos_dir):
+                    path = os.path.join(logos_dir, f)
+                    with open(path, "rb") as img:
+                        blob = put(f"logos/{job}_{f}", img.read(), {"access": "public"})
+                        logo_urls.append(blob["url"])
+
+            # KEEP SAME RESPONSE FORMAT
+            result["logos"] = logo_urls
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -52,20 +56,13 @@ class handler(BaseHTTPRequestHandler):
 
             self.wfile.write(json.dumps({
                 "success": True,
-                "data": result,
-                "total_images": len(images),
-                "images": images
+                "data": result
             }).encode())
 
         except Exception as e:
             self.send_response(500)
-            self.send_header("Content-Type", "application/json")
             self.end_headers()
-
             self.wfile.write(json.dumps({
                 "success": False,
                 "error": str(e)
             }).encode())
-
-    def do_POST(self):
-        return self.do_GET()
