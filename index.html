@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brand Asset Extractor</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Brand Asset Extractor</h1>
+            <p class="subtitle">Upload a PDF or Image to extract logos automatically using AI.</p>
+        </header>
+
+        <div class="input-section">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('upload')">File Upload</div>
+                <div class="tab" onclick="switchTab('url')">From URL</div>
+            </div>
+
+            <div id="upload-panel">
+                <div class="dropzone" id="dropzone">
+                    <div class="dropzone-icon">📁</div>
+                    <p>Drag & Drop your PDF here</p>
+                    <p style="font-size: 0.8rem; opacity: 0.6;">or click to browse</p>
+                    <input type="file" id="file-input" accept=".pdf,.png,.jpg" hidden>
+                </div>
+            </div>
+
+            <div id="url-panel" class="url-input-container">
+                <input type="text" class="url-input" id="url-input"
+                    placeholder="https://example.com/brand-guidelines.pdf">
+            </div>
+
+            <div class="status-area">
+                <div class="loading-bar" id="loading-bar">
+                    <div class="loading-progress" id="progress"></div>
+                </div>
+                <p class="status-text" id="status-text"></p>
+            </div>
+
+            <button class="btn-primary" id="process-btn" onclick="startProcessing()">Process Assets</button>
+        </div>
+
+        <div class="gallery-section">
+            <h2 class="section-title">Extracted Logos <span style="font-size: 0.8rem; opacity: 0.5;"
+                    id="count-badge"></span></h2>
+            <div class="gallery-grid" id="gallery-grid">
+                <div class="empty-state">
+                    No assets extracted yet.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
