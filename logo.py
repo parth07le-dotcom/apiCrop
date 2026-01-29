@@ -4,26 +4,22 @@ import hashlib
 import gallery_generator
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 PDF_PATH = os.path.join(BASE_DIR, "FINAL Brand Guidelines 10.29.19.pdf")
-OUTPUT = os.path.join(BASE_DIR, "assets")
 
-def extract_all_images():
+def extract_all_images(output_dir):
     if not os.path.exists(PDF_PATH):
-        print(f"Error: PDF not found at {PDF_PATH}")
-        return 0
+        return {"error": f"PDF not found at {PDF_PATH}"}
 
     try:
         doc = fitz.open(PDF_PATH)
     except Exception as e:
-        print(f"Error opening PDF: {e}")
-        return 0
+        return {"error": f"Error opening PDF: {e}"}
 
     seen = set()
     saved = 0
 
-    if not os.path.exists(OUTPUT):
-        os.makedirs(OUTPUT)
+    target_dir = os.path.join(output_dir, "extracted")
+    os.makedirs(target_dir, exist_ok=True)
 
     for page_i in range(len(doc)):
         page = doc[page_i]
@@ -41,19 +37,6 @@ def extract_all_images():
             seen.add(h_hash)
 
             name = f"page{page_i+1}_{img_i}.{ext}"
-            
-            # Save directly to OUTPUT (or organize into subfolders if preferred, 
-            # but original code put them in subfolders like 'others' via classify_image which is now gone.
-            # For now, let's just put them in 'assets/extracted' to keep them separate 
-            # or directly in assets. The gallery generator expects subfolders.
-            # The previous code had 'output/category/name'. 
-            # The user asked to remove "unnecessary code". 
-            # Without classify_image, we can't sort them.
-            # Let's put them all in a folder named 'extracted'.
-            
-            target_dir = os.path.join(OUTPUT, "extracted")
-            os.makedirs(target_dir, exist_ok=True)
-            
             path = os.path.join(target_dir, name)
 
             with open(path, "wb") as f:
@@ -61,14 +44,23 @@ def extract_all_images():
 
             saved += 1
 
-    return saved
+    return {"saved_count": saved, "output_dir": target_dir}
 
-def run():
-    extracted_count = extract_all_images()
-    gallery_generator.generate_gallery()
+def run(output_base_dir=None):
+    if output_base_dir is None:
+        output_base_dir = os.path.join(BASE_DIR, "assets")
+        
+    result = extract_all_images(output_base_dir)
+    
+    if "error" in result:
+        return result
+        
+    gallery_file = os.path.join(output_base_dir, "gallery_generated.html")
+    gallery_generator.generate_gallery(output_base_dir, gallery_file)
 
     return {
-        "pdf_images_extracted": extracted_count,
+        "pdf_images_extracted": result["saved_count"],
+        "gallery": gallery_file,
         "status": "completed"
     }
 
