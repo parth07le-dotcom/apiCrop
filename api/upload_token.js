@@ -1,7 +1,7 @@
 import { handleUpload } from '@vercel/blob/client';
 
 export const config = {
-    runtime: 'nodejs',
+    runtime: 'nodejs', // Switched to specific Node.js runtime to support Vercel Blob SDK
 };
 
 export default async function handler(request) {
