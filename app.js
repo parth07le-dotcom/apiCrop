@@ -1,4 +1,4 @@
-import { upload } from 'https://esm.sh/@vercel/blob@0.22.1/client';
+// import { upload } from 'https://esm.sh/@vercel/blob@0.22.1/client';
 
 console.log("App.js loaded, initializing...");
 
@@ -83,20 +83,20 @@ window.startProcessing = async function () {
 
             statusText.innerText = `Uploading ${selectedFile.name}...`;
 
-            // Client-Side Upload to Vercel Blob
-            const blob = await upload(selectedFile.name, selectedFile, {
-                access: 'public',
-                handleUploadUrl: '/api/upload_token',
-                onUploadProgress: (event) => {
-                    const percentage = Math.round((event.loaded / event.total) * 100);
-                    // Upload takes first 50% of the bar visually (just for UX feels)
-                    progress.style.width = `${percentage * 0.5}%`;
-                    statusText.innerText = `Uploading: ${percentage}%`;
-                }
+            statusText.innerText = `Preparing ${selectedFile.name}...`;
+
+            // Convert file to Base64 for direct upload
+            const toBase64 = file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
             });
 
-            console.log("File uploaded to Blob:", blob.url);
-            payload = { file_url: blob.url };
+            const base64Data = await toBase64(selectedFile);
+
+            // console.log("File converted to Base64");
+            payload = { pdf_base64: base64Data };
             progress.style.width = '55%';
 
         } else {
