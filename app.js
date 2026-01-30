@@ -127,11 +127,23 @@ window.startProcessing = async function () {
         clearInterval(progressInterval);
 
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error || `Server error: ${response.status}`);
+            const errText = await response.text();
+            try {
+                const errData = JSON.parse(errText);
+                throw new Error(errData.error || `Server error: ${response.status}`);
+            } catch (e) {
+                // If it's not JSON, it's likely an HTML error page or empty
+                throw new Error(`Server error ${response.status}: ${errText.substring(0, 100)}...`);
+            }
         }
 
-        const data = await response.json();
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
+        }
         progress.style.width = '100%';
 
         if (data.success) {

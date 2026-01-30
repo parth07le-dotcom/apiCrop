@@ -5,7 +5,7 @@ import gallery_generator
 
 # Defaults for local testing
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_PDF = os.path.join(BASE_DIR, "FINAL Brand Guidelines 10.29.19.pdf")
+DEFAULT_PDF = os.path.join(BASE_DIR, "2016-CMOC-Brand-ID-10-3-16.pdf")
 
 def extract_all_images(output_dir, pdf_path):
     if not os.path.exists(pdf_path):

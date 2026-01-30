@@ -12,10 +12,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def home():
     return send_from_directory(BASE_DIR, 'index.html')
 
-@app.route('/<path:path>')
-def serve_static(path):
-    return send_from_directory(BASE_DIR, path)
-
 @app.route('/api/logo', methods=['POST'])
 def api_logo():
     try:
@@ -45,11 +41,13 @@ def api_logo():
         else:
             return jsonify({"success": False, "error": "No file provided"})
 
+        print(f"Processing job {job}, saving to {workdir}")
+        print(f"Input path: {input_path}")
+
         # Run extraction
-        # logo.run expects (output_base_dir, input_pdf_path)
-        # It normally outputs to `assets` or the provided dir. 
-        # Let's direct it to our workdir so we can find the files.
+        print("Calling logo.extract_all_images...")
         result = logo.extract_all_images(workdir, input_path)
+        print(f"Extraction result: {result}")
         
         if "error" in result:
              return jsonify({"success": False, "error": result["error"]})
@@ -78,9 +76,45 @@ def api_logo():
         print(f"Error: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/images', methods=['GET'])
+def get_all_images():
+    """
+    Scans temp_uploads for all images and returns them grouped by job ID (category).
+    """
+    temp_dir = os.path.join(BASE_DIR, "temp_uploads")
+    assets = {}
+
+    if not os.path.exists(temp_dir):
+        return jsonify({})
+
+    # Walk through all jobs
+    for job_id in os.listdir(temp_dir):
+        job_path = os.path.join(temp_dir, job_id)
+        if not os.path.isdir(job_path):
+            continue
+
+        # Check for 'logos' folder inside the job
+        logos_path = os.path.join(job_path, "logos")
+        if os.path.exists(logos_path) and os.path.isdir(logos_path):
+            images = []
+            for f in os.listdir(logos_path):
+                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                    # Use the same serving path convention
+                    images.append(f)
+            
+            if images:
+                assets[job_id] = images
+
+    return jsonify(assets)
+
 @app.route('/temp_uploads/<path:filename>')
 def serve_uploads(filename):
     return send_from_directory(os.path.join(BASE_DIR, "temp_uploads"), filename)
+
+# Moved to the bottom to avoid shadowing other routes
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_from_directory(BASE_DIR, path)
 
 if __name__ == '__main__':
     print("Starting local server at http://localhost:5000")

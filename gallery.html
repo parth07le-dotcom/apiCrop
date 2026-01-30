@@ -65,10 +65,10 @@
             cursor: pointer;
             color: var(--text-secondary);
             font-size: 0.95rem;
-            transition: all 0.2s;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: all 0.2s;
         }
 
         .nav-item:hover {
@@ -320,13 +320,36 @@
 
     <script>
         // Data populated from Python
-        const assets = { "extracted": ["page28_0.jpeg", "page29_0.jpeg", "page37_0.jpeg", "page37_1.png", "page37_2.jpeg", "page37_3.png", "page60_0.jpeg", "page60_1.jpeg", "page60_2.jpeg", "page60_3.jpeg", "page60_4.jpeg", "page60_5.jpeg", "page60_6.jpeg", "page60_7.jpeg", "page61_0.jpeg", "page61_1.jpeg", "page61_10.jpeg", "page61_11.jpeg", "page61_2.jpeg", "page61_3.jpeg", "page61_4.jpeg", "page61_5.jpeg", "page61_6.jpeg", "page61_7.jpeg", "page61_8.jpeg", "page61_9.jpeg", "page62_0.jpeg", "page62_1.jpeg", "page62_10.jpeg", "page62_2.jpeg", "page62_3.jpeg", "page62_4.jpeg", "page62_5.jpeg", "page62_6.jpeg", "page62_7.jpeg", "page62_8.jpeg", "page62_9.jpeg", "page63_0.jpeg", "page63_1.jpeg", "page63_10.jpeg", "page63_2.jpeg", "page63_3.jpeg", "page63_4.jpeg", "page63_5.jpeg", "page63_6.jpeg", "page63_7.jpeg", "page63_8.jpeg", "page63_9.jpeg", "page64_0.jpeg", "page64_1.jpeg", "page64_10.jpeg", "page64_11.jpeg", "page64_2.jpeg", "page64_3.jpeg", "page64_4.jpeg", "page64_5.jpeg", "page64_6.jpeg", "page64_7.jpeg", "page64_8.jpeg", "page64_9.jpeg", "page65_0.jpeg", "page65_1.jpeg", "page65_2.jpeg", "page65_3.jpeg", "page65_4.jpeg", "page65_5.jpeg", "page65_6.jpeg", "page65_7.jpeg", "page65_8.jpeg", "page65_9.jpeg", "page67_0.png", "page69_0.png", "page69_1.png", "page73_0.jpeg", "page73_1.jpeg", "page73_2.jpeg", "page73_3.jpeg", "page73_4.jpeg", "page74_0.jpeg", "page74_1.jpeg", "page74_2.jpeg", "page74_3.jpeg", "page74_4.jpeg", "page74_5.jpeg", "page74_6.jpeg", "page74_7.jpeg", "page79_0.png", "page82_0.jpeg", "page82_1.jpeg", "page82_2.jpeg", "page82_3.png", "page83_0.jpeg", "page83_1.jpeg", "page83_2.jpeg", "page83_3.jpeg", "page83_4.jpeg", "page83_5.jpeg", "page83_6.jpeg", "page83_7.jpeg", "page83_8.jpeg", "page83_9.jpeg", "page84_0.jpeg", "page84_1.png", "page84_2.jpeg", "page84_3.jpeg", "page84_4.png", "page90_0.jpeg", "page90_1.jpeg", "page90_2.jpeg", "page90_3.jpeg", "page92_0.png", "page92_1.png", "page92_3.jpeg", "page92_4.jpeg", "page93_0.jpeg", "page93_1.png", "page93_15.png", "page93_18.png", "page93_19.jpeg", "page93_2.jpeg", "page93_3.png"] };
+        let assets = {};
         let currentCategory = 'all';
         let currentImages = [];
         let currentIndex = 0;
 
-        function init() {
+        async function init(silent = false) {
             const categoryList = document.getElementById('category-list');
+            let newAssets = {};
+
+            try {
+                const response = await fetch('/api/images');
+                if (response.ok) {
+                    newAssets = await response.json();
+
+                    // Simple check to avoid redraw if data is same
+                    if (silent && JSON.stringify(newAssets) === JSON.stringify(assets)) return;
+
+                    assets = newAssets;
+                } else {
+                    console.error("Failed to fetch assets");
+                    assets = {};
+                }
+            } catch (e) {
+                console.error("Error fetching assets:", e);
+                assets = {};
+            }
+
+            // Clear to rebuild (unless silent & same, which is handled above)
+            categoryList.innerHTML = '';
+
             let totalCount = 0;
 
             // Build Category Map
@@ -336,15 +359,33 @@
 
                 const item = document.createElement('div');
                 item.className = 'nav-item';
-                item.innerHTML = `${cat} <span class="badge">${count}</span>`;
+                // Use a shorter name for display if it's a UUID
+                const displayName = cat.length > 8 ? 'Upload ' + cat.substring(0, 4) : cat;
+
+                item.innerHTML = `${displayName} <span class="badge">${count}</span>`;
                 item.onclick = function () { filterCategory(cat, this); };
+
+                if (currentCategory === cat) item.classList.add('active');
+
                 categoryList.appendChild(item);
             });
 
             document.getElementById('badge-all').innerText = totalCount;
 
-            // Initial Render
-            filterCategory('all', document.querySelector('.nav-item.active'));
+            // If current category is gone, switch to all
+            if (currentCategory !== 'all' && !assets[currentCategory]) {
+                currentCategory = 'all';
+            }
+
+            // Ensure visual state matches for 'All'
+            if (currentCategory === 'all') {
+                document.querySelector('.nav-item').classList.add('active');
+            }
+
+            // Only re-render grid if not silent or if we decided to update
+            if (!silent || (currentCategory === 'all' || assets[currentCategory])) {
+                renderGrid();
+            }
         }
 
         function filterCategory(cat, element) {
@@ -353,7 +394,7 @@
             if (element) element.classList.add('active');
 
             currentCategory = cat;
-            document.getElementById('page-title').innerText = cat === 'all' ? 'All Assets' : cat;
+            document.getElementById('page-title').innerText = cat === 'all' ? 'All Assets' : (cat.length > 8 ? 'Upload ' + cat.substring(0, 4) : cat);
 
             renderGrid();
         }
@@ -369,7 +410,8 @@
                 assets[key].forEach(file => {
                     if (searchTerm && !file.toLowerCase().includes(searchTerm.toLowerCase())) return;
 
-                    const relPath = `assets/${key}/${file}`;
+                    // Construct path for local server: /temp_uploads/<job_id>/logos/<filename>
+                    const relPath = `/temp_uploads/${key}/logos/${file}`;
 
                     // Track for modal
                     currentImages.push({ path: relPath, name: file, category: key });
@@ -440,6 +482,11 @@
 
         // Initialize
         init();
+
+        // Auto-refresh every 5 seconds to reflect new uploads
+        setInterval(() => {
+            init(true); // Pass true to indicate silent update
+        }, 5000);
 
     </script>
 </body>
