@@ -1,4 +1,4 @@
-import { upload } from 'https://esm.sh/@vercel/blob@0.22.1/client';
+// import { upload } from 'https://esm.sh/@vercel/blob@0.22.1/client';
 
 console.log("App.js loaded, initializing...");
 

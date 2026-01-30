@@ -4,7 +4,7 @@ import json, os, sys, base64, uuid, urllib.request
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import logo
 
-from vercel_blob import put
+from my_blob_utils import put
 
 
 class handler(BaseHTTPRequestHandler):
