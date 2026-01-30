@@ -83,27 +83,32 @@ window.startProcessing = async function () {
 
             statusText.innerText = `Uploading ${selectedFile.name}...`;
 
-            // Upload directly to Vercel Blob
-            // Note: This requires the BLOB_READ_WRITE_TOKEN to be set in Vercel env vars
-            // and a token generation endpoint or public access (if configured). 
-            // For simplicity in this demo, we assume the token is available via an API or 
-            // we use the 'client' upload which typically needs a token handler.
+            // Upload directly to Vercel Blob (Manual PUT)
+            // 1. Get Signed Upload URL from Python API
+            const authResp = await fetch('/api/upload_token');
+            if (!authResp.ok) throw new Error("Failed to get upload permissions");
+            const authData = await authResp.json();
 
-            // However, Vercel Blob client upload requires a server-side route to issue a token.
-            // Let's assume we have '/api/upload_token' or similar. 
-            // IF NOT, and we want to keep it simple, we might need to rely on the server handling it
-            // BUT the server has the 4.5MB limit. 
+            if (authData.error) throw new Error(authData.error);
+            const uploadUrl = authData.uploadUrl;
 
-            // Wait, to use client-side upload, we need `handleUpload` on the server.
-            // Let's implement the client upload using the standard pattern:
-
-            const newBlob = await upload(selectedFile.name, selectedFile, {
-                access: 'public',
-                handleUploadUrl: '/api/upload_token', // We need to ensure this exists!
+            // 2. Upload File via PUT to the signed URL
+            const uploadResp = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: selectedFile,
+                headers: {
+                    'x-ms-blob-type': 'BlockBlob', // Required for some Vercel Blob/Azure backing
+                }
             });
 
-            console.log("Blob uploaded:", newBlob.url);
-            payload = { file_url: newBlob.url };
+            if (!uploadResp.ok) throw new Error("File upload failed");
+
+            // 3. Extract the clean public URL
+            // The uploadUrl usually ends with a token query string. The file is accessible at the base URL.
+            const blobUrl = uploadUrl.split('?')[0];
+
+            console.log("Blob uploaded:", blobUrl);
+            payload = { file_url: blobUrl };
             progress.style.width = '55%';
 
         } else {
