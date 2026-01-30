@@ -4,8 +4,8 @@ export const config = {
     runtime: 'nodejs', // Switched to specific Node.js runtime to support Vercel Blob SDK
 };
 
-export default async function handler(request) {
-    const body = await request.json();
+export default async function handler(request, response) {
+    const body = request.body;
 
     try {
         const jsonResponse = await handleUpload({
@@ -33,18 +33,8 @@ export default async function handler(request) {
             },
         });
 
-        return new Response(JSON.stringify(jsonResponse), {
-            status: 200,
-            headers: {
-                'content-type': 'application/json',
-            },
-        });
+        response.status(200).json(jsonResponse);
     } catch (error) {
-        return new Response(
-            JSON.stringify(
-                { error: error.message },
-            ),
-            { status: 400 },
-        );
+        response.status(400).json({ error: error.message });
     }
 }
