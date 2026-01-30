@@ -79,33 +79,68 @@ def api_logo():
 @app.route('/api/images', methods=['GET'])
 def get_all_images():
     """
-    Scans temp_uploads for all images and returns them grouped by job ID (category).
+    Scans temp_uploads AND assets for all images.
+    Returns unified format: { "Category": [ { "name": "...", "url": "..." } ] }
     """
-    temp_dir = os.path.join(BASE_DIR, "temp_uploads")
     assets = {}
 
-    if not os.path.exists(temp_dir):
-        return jsonify({})
+    # 1. Scan temp_uploads (Dynamic Jobs)
+    temp_dir = os.path.join(BASE_DIR, "temp_uploads")
+    if os.path.exists(temp_dir):
+        for job_id in os.listdir(temp_dir):
+            job_path = os.path.join(temp_dir, job_id)
+            if not os.path.isdir(job_path):
+                continue
 
-    # Walk through all jobs
-    for job_id in os.listdir(temp_dir):
-        job_path = os.path.join(temp_dir, job_id)
-        if not os.path.isdir(job_path):
-            continue
+            logos_path = os.path.join(job_path, "logos")
+            if os.path.exists(logos_path) and os.path.isdir(logos_path):
+                images = []
+                for f in os.listdir(logos_path):
+                    if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                        images.append({
+                            "name": f,
+                            "url": f"/temp_uploads/{job_id}/logos/{f}",
+                            "date": os.path.getmtime(os.path.join(logos_path, f))
+                        })
+                
+                if images:
+                    assets[job_id] = images
 
-        # Check for 'logos' folder inside the job
-        logos_path = os.path.join(job_path, "logos")
-        if os.path.exists(logos_path) and os.path.isdir(logos_path):
-            images = []
-            for f in os.listdir(logos_path):
-                if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                    # Use the same serving path convention
-                    images.append(f)
-            
-            if images:
-                assets[job_id] = images
+    # 2. Scan assets/logos (Static/Previous)
+    assets_dir = os.path.join(BASE_DIR, "assets", "logos")
+    if os.path.exists(assets_dir) and os.path.isdir(assets_dir):
+        static_images = []
+        for f in os.listdir(assets_dir):
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                static_images.append({
+                    "name": f,
+                    "url": f"/assets/logos/{f}",
+                    "date": os.path.getmtime(os.path.join(assets_dir, f))
+                })
+        
+        if static_images:
+            assets["Static Assets"] = static_images
+
+    # 3. Scan assets/extracted (Legacy)
+    legacy_dir = os.path.join(BASE_DIR, "assets", "extracted")
+    if os.path.exists(legacy_dir) and os.path.isdir(legacy_dir):
+        legacy_images = []
+        for f in os.listdir(legacy_dir):
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                legacy_images.append({
+                    "name": f,
+                    "url": f"/assets/extracted/{f}", # Route needed?
+                    "date": os.path.getmtime(os.path.join(legacy_dir, f))
+                })
+        
+        if legacy_images:
+            assets["Legacy Extracted"] = legacy_images
 
     return jsonify(assets)
+
+@app.route('/assets/<path:path>')
+def serve_assets_folder(path):
+    return send_from_directory(os.path.join(BASE_DIR, "assets"), path)
 
 @app.route('/temp_uploads/<path:filename>')
 def serve_uploads(filename):

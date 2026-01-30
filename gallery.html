@@ -360,7 +360,7 @@
                 const item = document.createElement('div');
                 item.className = 'nav-item';
                 // Use a shorter name for display if it's a UUID
-                const displayName = cat.length > 8 ? 'Upload ' + cat.substring(0, 4) : cat;
+                const displayName = cat.length > 8 && !cat.includes(' ') ? 'Upload ' + cat.substring(0, 4) : cat;
 
                 item.innerHTML = `${displayName} <span class="badge">${count}</span>`;
                 item.onclick = function () { filterCategory(cat, this); };
@@ -394,7 +394,8 @@
             if (element) element.classList.add('active');
 
             currentCategory = cat;
-            document.getElementById('page-title').innerText = cat === 'all' ? 'All Assets' : (cat.length > 8 ? 'Upload ' + cat.substring(0, 4) : cat);
+            const displayName = cat === 'all' ? 'All Assets' : (cat.length > 8 && !cat.includes(' ') ? 'Upload ' + cat.substring(0, 4) : cat);
+            document.getElementById('page-title').innerText = displayName;
 
             renderGrid();
         }
@@ -407,14 +408,28 @@
             const keys = currentCategory === 'all' ? Object.keys(assets) : [currentCategory];
 
             keys.forEach(key => {
-                assets[key].forEach(file => {
-                    if (searchTerm && !file.toLowerCase().includes(searchTerm.toLowerCase())) return;
+                assets[key].forEach(imgObj => {
+                    // Handle both old format (string) and new format (object) for backward compatibility
+                    // server.py now returns { name, url }
+                    // api/images.js returns { name, url }
 
-                    // Construct path for local server: /temp_uploads/<job_id>/logos/<filename>
-                    const relPath = `/temp_uploads/${key}/logos/${file}`;
+                    let fileName = '';
+                    let fileUrl = '';
+                    let fileCategory = key;
+
+                    if (typeof imgObj === 'string') {
+                        // Fallback for string-based legacy data (if any remains)
+                        fileName = imgObj;
+                        fileUrl = `/temp_uploads/${key}/logos/${imgObj}`; // Assumption
+                    } else {
+                        fileName = imgObj.name;
+                        fileUrl = imgObj.url;
+                    }
+
+                    if (searchTerm && !fileName.toLowerCase().includes(searchTerm.toLowerCase())) return;
 
                     // Track for modal
-                    currentImages.push({ path: relPath, name: file, category: key });
+                    currentImages.push({ path: fileUrl, name: fileName, category: fileCategory });
                     const idx = currentImages.length - 1;
 
                     const card = document.createElement('div');
@@ -422,8 +437,8 @@
                     card.onclick = () => openModal(idx);
 
                     card.innerHTML = `
-                        <img src="${relPath}" class="card-img" loading="lazy">
-                        <div class="card-info">${file}</div>
+                        <img src="${fileUrl}" class="card-img" loading="lazy">
+                        <div class="card-info">${fileName}</div>
                     `;
                     grid.appendChild(card);
                 });
