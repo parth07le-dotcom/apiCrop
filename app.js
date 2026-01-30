@@ -1,4 +1,4 @@
-// import { upload } from 'https://esm.sh/@vercel/blob@0.22.1/client';
+// Python-only backend migration: Client-side upload via manual PUT
 
 console.log("App.js loaded, initializing...");
 
