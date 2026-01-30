@@ -1,4 +1,4 @@
-// Python-only backend migration: Client-side upload via manual PUT
+import { upload } from 'https://esm.sh/@vercel/blob@0.22.1/client';
 
 console.log("App.js loaded, initializing...");
 
@@ -83,32 +83,14 @@ window.startProcessing = async function () {
 
             statusText.innerText = `Uploading ${selectedFile.name}...`;
 
-            // Upload directly to Vercel Blob (Manual PUT)
-            // 1. Get Signed Upload URL from Python API
-            const authResp = await fetch('/api/upload_token');
-            if (!authResp.ok) throw new Error("Failed to get upload permissions");
-            const authData = await authResp.json();
-
-            if (authData.error) throw new Error(authData.error);
-            const uploadUrl = authData.uploadUrl;
-
-            // 2. Upload File via PUT to the signed URL
-            const uploadResp = await fetch(uploadUrl, {
-                method: 'PUT',
-                body: selectedFile,
-                headers: {
-                    'x-ms-blob-type': 'BlockBlob', // Required for some Vercel Blob/Azure backing
-                }
+            // Upload directly to Vercel Blob (Client SDK)
+            const newBlob = await upload(selectedFile.name, selectedFile, {
+                access: 'public',
+                handleUploadUrl: '/api/upload_token',
             });
 
-            if (!uploadResp.ok) throw new Error("File upload failed");
-
-            // 3. Extract the clean public URL
-            // The uploadUrl usually ends with a token query string. The file is accessible at the base URL.
-            const blobUrl = uploadUrl.split('?')[0];
-
-            console.log("Blob uploaded:", blobUrl);
-            payload = { file_url: blobUrl };
+            console.log("Blob uploaded:", newBlob.url);
+            payload = { file_url: newBlob.url };
             progress.style.width = '55%';
 
         } else {
@@ -129,7 +111,6 @@ window.startProcessing = async function () {
         }, 300);
 
         // API Call to Python Backend
-        // The backend now just receives the URL (from Blob or Input)
         const response = await fetch('/api/logo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -144,7 +125,6 @@ window.startProcessing = async function () {
                 const errData = JSON.parse(errText);
                 throw new Error(errData.error || `Server error: ${response.status}`);
             } catch (e) {
-                // If it's not JSON, it's likely an HTML error page or empty
                 throw new Error(`Server error ${response.status}: ${errText.substring(0, 100)}...`);
             }
         }
