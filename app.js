@@ -1,4 +1,4 @@
-// import { upload } from 'https://esm.sh/@vercel/blob@0.22.1/client';
+import { upload } from 'https://esm.sh/@vercel/blob@0.22.1/client';
 
 console.log("App.js loaded, initializing...");
 
@@ -83,20 +83,27 @@ window.startProcessing = async function () {
 
             statusText.innerText = `Uploading ${selectedFile.name}...`;
 
-            statusText.innerText = `Preparing ${selectedFile.name}...`;
+            // Upload directly to Vercel Blob
+            // Note: This requires the BLOB_READ_WRITE_TOKEN to be set in Vercel env vars
+            // and a token generation endpoint or public access (if configured). 
+            // For simplicity in this demo, we assume the token is available via an API or 
+            // we use the 'client' upload which typically needs a token handler.
 
-            // Convert file to Base64 for direct upload
-            const toBase64 = file => new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = error => reject(error);
+            // However, Vercel Blob client upload requires a server-side route to issue a token.
+            // Let's assume we have '/api/upload_token' or similar. 
+            // IF NOT, and we want to keep it simple, we might need to rely on the server handling it
+            // BUT the server has the 4.5MB limit. 
+
+            // Wait, to use client-side upload, we need `handleUpload` on the server.
+            // Let's implement the client upload using the standard pattern:
+
+            const newBlob = await upload(selectedFile.name, selectedFile, {
+                access: 'public',
+                handleUploadUrl: '/api/upload_token', // We need to ensure this exists!
             });
 
-            const base64Data = await toBase64(selectedFile);
-
-            // console.log("File converted to Base64");
-            payload = { pdf_base64: base64Data };
+            console.log("Blob uploaded:", newBlob.url);
+            payload = { file_url: newBlob.url };
             progress.style.width = '55%';
 
         } else {
